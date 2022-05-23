@@ -1,0 +1,350 @@
+( constants )
+%SYSVARS+#18 { #fe18 }
+%RS_ADDR { #ff00 }
+%PS_ADDR { #fffa }
+
+( macros )
+%MOD { DIVk MUL SUB }
+%MOD2 { DIV2k MUL2 SUB2 }
+%RTN { JMP2r }
+%HALF2 { DUP2 #8000 AND2 #01 SFT2 ORA2 } ( signed division by 2 )
+
+( zero page )
+|00 @ZP [ &psp $2 &rsp $2 &ir $2 &pc $2 &curX $1 &curY $1 &tmpX $1 &tmpY $1 &tmp1 $2 &tmp2 $2 ]
+
+( keyboard buffer )
+@KBuf [ &read $1 &write $1 &altgr-flag $1 &buf $10 ]
+
+( cursor sprite )
+|f0 @EmptySprite $1 @CursorSprite $8
+
+( devices )
+|00 @System [ &vector $2 &wst $1 &rst $1 &pad $4 &r $2 &g $2 &b $2 &debug $1 &halt $1 ]
+|10 @Console [ &vector $2 &read $1 &pad $5 &write $1 &error $1 ]
+|20 @Screen [ &vector $2 &width $2 &height $2 &pad $2 &x $2 &y $2 &addr $2 &pixel $1 &sprite $1 ]
+|80 @Controller [ &vector $2 &button $1 &key $1 ]
+
+( stable ABI )
+|0100 ;init JMP2
+
+( main program )
+@main
+	( probably read ROM )
+	DEO2
+	( initialize file interface for blkfs )
+	;blkinit JSR2
+	( setup screen vector and keyboard vector )
+	;handler .Screen/vector DEO2
+	;key-handler .Controller/vector DEO2
+	BRK
+
+( utility functions )
+@ppeek ( read PSP and place on stack )
+	.ZP/psp LDZ2 LDA2
+	RTN
+
+@ppop ( read PSP and place on stack, then increment PSP )
+	,ppeek JSR .ZP/psp LDZ2 INC2 INC2 .ZP/psp STZ2
+	RTN
+
+@ppush ( decrement psp then store value from stack there )
+	.ZP/psp LDZ2 #0002 SUB2 DUP2 .ZP/psp STZ2 STA2
+	RTN
+
+@rpop ( read RSP and place on stack, then decrement RSP )
+	.ZP/rsp LDZ2 DUP2 LDA2 SWP2 #0002 SUB2 .ZP/rsp STZ2
+	RTN
+
+@rpush ( increment RSP then store value from stack there )
+	.ZP/rsp LDZ2 INC2 INC2 DUP2 .ZP/rsp STZ2 STA2
+	RTN
+
+@pc16 ( read WORD at PC to stack and increment PC )
+	.ZP/pc LDZ2 DUP2 LDA2 SWP2 INC2 INC2 .ZP/pc STZ2
+	RTN
+
+@jumptable ( jump table for commands )
+	( 00 ) :op-DUP :op-DROP :op-i>, :op-(i)>, :op-SWAP :op-OVER :op-ROT :op-lblnext
+	( 08 ) :op-(?br) :op-(next) :op-CALLi, :op-JMPi, :op-lblxt :op-EXIT :op-?DUP :op-(b)
+	( 10 ) :op-(n) :op-JMP(i), :op-lbldoes :op-lblval :op-uxnCell :op-EXECUTE :op-(key) :op-uxnStorage
+	( 18 ) :op-uxnDEI :op-uxnDEO :op-R~ :op-uxnDEI2 :op-+ :op-- :op-(br) :op-uxnDEO2
+	( 20 ) :op-* :op-< :op-/MOD :op-QUIT :op-ABORT :op-RCNT :op-NOT :op-AND
+	( 28 ) :op-OR :op-XOR :op-SCNT :op-BYE :op-R@ :op-R> :op->R :op-C@
+	( 30 ) :op-@ :op-! :op-C!
+
+@key-handler ( keyboard handler )
+	.Controller/key DEI
+	DUP #00 EQU ,&done JCN ( check for char )
+	.Controller/button DEI
+	( most of the code here is for handling AltGr keys, which create both Ctrl+Alt+X and Ctrl+Alt+special character )
+	DUP #fb AND #03 EQU ,&altgr-char JCN
+	#fb AND #00 EQU ,&normalkey JCN
+	,&done JMP
+	&altgr-char POP ( key is on stack )
+	.KBuf/altgr-flag LDZ #01 EQU ,&normalkey JCN
+	#01 .KBuf/altgr-flag STZ
+	,&done JMP
+	&normalkey
+	( normal key on stack - store to key buffer )
+	#00 .KBuf/altgr-flag STZ
+	.KBuf/write LDZ #01 ADD #10 MOD .KBuf/read LDZ EQU ,&done JCN ( check for room )
+	DUP .KBuf/write LDZ .KBuf/buf ADD STZ ( store char )
+	.KBuf/write LDZ #01 ADD #10 MOD .KBuf/write STZ ( increase pointer )
+	&done POP
+	BRK
+
+@handler ( run next command )
+	.ZP/pc LDZ2 #ffff EQU2 ,&done JCN
+	&next
+	.ZP/pc LDZ2 DUP2 INC2 .ZP/pc STZ2 LDA ( stack: op )
+	DUP #32 GTH ,&stop JCN
+	#00 SWP DUP2 ADD2 ;jumptable ADD2 LDA2 JMP2
+	&stop
+	#ffff .ZP/pc STZ2
+	&done
+	BRK
+
+@op-(br) ( branch IR to offset read at IR )
+	#00 .ZP/ir LDZ2 LDA DUP #80 LTH ,&positive JCN #0100 SUB2
+	&positive .ZP/ir LDZ2 ADD2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-(?br)
+	;ppop JSR2 #0000 EQU2 ,op-(br) JCN
+	.ZP/ir LDZ2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-(next)
+	;rpop JSR2 #0001 SUB2 DUP2 #0000 EQU2 ,&zero JCN
+		;rpush JSR2 ,op-(br) JMP
+	&zero POP2 .ZP/ir LDZ2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-DUP
+	;ppeek JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-?DUP
+	;ppeek JSR2 #0000 NEQ2 ,op-DUP JCN
+	;handler/next JMP2
+
+@op-DROP
+	;ppop JSR2 POP2
+	;handler/next JMP2
+
+@op-i>,
+	;pc16 JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-(i)>,
+	;pc16 JSR2 LDA2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-SWAP
+	;ppop JSR2 ;ppop JSR2 SWP2 ;ppush JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-OVER
+	;ppop JSR2 ;ppeek JSR2 SWP2 ;ppush JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-ROT
+	;ppop JSR2 ;ppop JSR2 ;ppop JSR2 ROT2 ROT2 ;ppush JSR2 ;ppush JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-lblnext ( pc = gw(ir); ir += 2 )
+	.ZP/ir LDZ2 DUP2 LDA2 .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-CALLi,
+	.ZP/pc LDZ2 INC2 INC2 ;ppush JSR2
+	.ZP/pc LDZ2 LDA2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-JMPi,
+	.ZP/pc LDZ2 LDA2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-lblxt
+	.ZP/ir LDZ2 ;rpush JSR2
+	;ppop JSR2 DUP2 INC2 INC2 .ZP/ir STZ2
+	LDA2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-EXIT
+	;rpop JSR2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-(b)
+	.ZP/ir LDZ2 DUP2 LDA #00 SWP ;ppush JSR2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-(n)
+	.ZP/ir LDZ2 DUP2 LDA2 ;ppush JSR2 INC2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-JMP(i),
+	.ZP/pc LDZ2 LDA2 LDA2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-lbldoes
+	;ppop JSR2 DUP2 INC2 INC2 ;ppush JSR2
+	LDA2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-lblval
+	SYSVARS+#18 LDA #00 EQU ,&zero JCN
+	#00 SYSVARS+#18 STA
+	;ppop JSR2 ;ppop JSR2 SWP2 STA2
+	,&done JMP
+	&zero
+	;ppop JSR2 LDA2 ;ppush JSR2
+	&done
+	.ZP/ir LDZ2 DUP2 LDA2 .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
+	;handler/next JMP2
+
+@op-uxnCell
+	;ppop JSR2 .ZP/tmp1 STZ2 ( tmp1 = font address )
+	;ppop JSR2 SWP POP .ZP/tmpY STZ ( tmpY = y coordinate )
+	;ppop JSR2 SWP POP .ZP/tmpX STZ ( tmpX = x coordinate )
+	;ppop JSR2 SWP POP .ZP/tmp2 STZ ( tmp2 = character )
+	.ZP/tmp2 LDZ #20 LTH ,&cursor JCN
+
+	#00 .ZP/tmpY LDZ INC2 #0008 MUL2 .Screen/y DEO2
+	#00 .ZP/tmpX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#00 .ZP/tmp2 LDZ #20 SUB #0007 MUL2 .ZP/tmp1 LDZ2 ADD2 .Screen/addr DEO2
+	#49 .Screen/sprite DEO
+	;CursorSprite .Screen/addr DEO2
+	#4a .Screen/sprite DEO
+	,&done JMP
+	&cursor
+	;CursorSprite .Screen/addr DEO2
+	#00 .ZP/curY LDZ INC2 #0008 MUL2 .Screen/y DEO2
+	#00 .ZP/curX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#4a .Screen/sprite DEO
+	.ZP/tmpX LDZ .ZP/curX STZ
+	.ZP/tmpY LDZ .ZP/curY STZ
+	#00 .ZP/curY LDZ INC2 #0008 MUL2 .Screen/y DEO2
+	#00 .ZP/curX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#4f .Screen/sprite DEO
+
+	&done
+	;handler/next JMP2
+
+@op-EXECUTE
+	;ppop JSR2 .ZP/pc STZ2
+	;handler/next JMP2
+
+@op-(key)
+	.KBuf/read LDZ .KBuf/write LDZ EQU ,&nokey JCN
+	#00 .KBuf/read LDZ DUP INC #10 MOD .KBuf/read STZ .KBuf/buf ADD LDZ ;ppush JSR2
+	#0001 ;ppush JSR2
+	;handler/next JMP2
+	&nokey
+	#0000 ;ppush JSR2
+	;handler/done JMP2
+
+@op-R~
+	;rpop JSR2 POP2
+	;handler/next JMP2
+
+@op-+
+	;ppop JSR2 ;ppop JSR2 ADD2 ;ppush JSR2
+	;handler/next JMP2
+
+@op--
+	;ppop JSR2 ;ppop JSR2 SWP2 SUB2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-<
+	#00 ;ppop JSR2 ;ppop JSR2 GTH2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-NOT
+	#00 ;ppop JSR2 #0000 EQU2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-AND
+	;ppop JSR2 ;ppop JSR2 AND2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-OR
+	;ppop JSR2 ;ppop JSR2 ORA2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-XOR
+	;ppop JSR2 ;ppop JSR2 EOR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-*
+	;ppop JSR2 ;ppop JSR2 MUL2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-/MOD
+	;ppop JSR2 DUP2 ;ppop JSR2 SWP2 OVR2 SWP2
+	MOD2 ;ppush JSR2 SWP2 DIV2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-QUIT
+	RS_ADDR .ZP/rsp STZ2
+	;handler/next JMP2
+
+@op-ABORT
+	PS_ADDR .ZP/psp STZ2
+	;handler/next JMP2
+
+@op-RCNT
+	.ZP/rsp LDZ2 RS_ADDR SUB2 HALF2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-SCNT
+	PS_ADDR .ZP/psp LDZ2 SUB2 HALF2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-BYE
+	#ffff .ZP/pc STZ2
+	;handler/done JMP2
+
+@op-R@
+	.ZP/rsp LDZ2 LDA2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-R>
+	;rpop JSR2 ;ppush JSR2
+	;handler/next JMP2
+
+@op->R
+	;ppop JSR2 ;rpush JSR2
+	;handler/next JMP2
+
+@op-C@
+	#00 ;ppop JSR2 LDA ;ppush JSR2
+	;handler/next JMP2
+
+@op-@
+	;ppop JSR2 LDA2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-!
+	;ppop JSR2 ;ppop JSR2 SWP2 STA2
+	;handler/next JMP2
+
+@op-C!
+	;ppop JSR2 ;ppop JSR2 SWP2 STA POP
+	;handler/next JMP2
+
+@op-uxnDEI
+	;ppop JSR2 DEI ;ppush JSR2
+	;handler/next JMP2
+
+@op-uxnDEO
+	;ppop JSR2 SWP POP ;ppop JSR2 SWP POP SWP DEO
+	;handler/next JMP2
+
+@op-uxnDEI2
+	;ppop JSR2 SWP POP DEI2 ;ppush JSR2
+	;handler/next JMP2
+
+@op-uxnDEO2
+	;ppop JSR2 ;ppop JSR2 SWP2 SWP POP DEO2
+	;handler/next JMP2

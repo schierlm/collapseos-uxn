@@ -1,0 +1,45 @@
+( collapseOS without filesystem support )
+~common.tal
+
+@blkinit RTN
+
+@op-uxnStorage ;handler/stop JMP2
+
+@init
+	( initialize zero page )
+	PS_ADDR .ZP/psp STZ2
+	RS_ADDR .ZP/rsp STZ2
+	#ffff .ZP/ir STZ2
+	;ROMSTART .ZP/pc STZ2
+	#00 .KBuf/read STZ
+	#00 .KBuf/write STZ
+	#00 .KBuf/altgr-flag STZ
+	#00 .ZP/curX STZ
+	#00 .ZP/curY STZ
+	( initialize theme )
+	#0f0f .System/r DEO2
+	#0f0f .System/g DEO2
+	#0ff0 .System/b DEO2
+
+	( initialize and clear screen )
+	#0290 .Screen/width DEO2
+	#00d8 .Screen/height DEO2
+	.EmptySprite #00
+	&clearloop ADDk #00 SWP STZ INC DUP #08 LTH ,&clearloop JCN
+	ADD #fe SWP STZ
+	;EmptySprite .Screen/addr DEO2
+	#00 #00 ( stack: y x )
+	&lineloop
+	OVR INC #00 SWP #0008 MUL2 .Screen/y DEO2
+	&cellloop
+	DUP INC #00 SWP #0008 MUL2 .Screen/x DEO2
+	#49 .Screen/sprite DEO
+	INC DUP #50 LTH ,&cellloop JCN
+	POP INC #00 OVR #19 LTH ,&lineloop JCN
+	POP2
+	( dummy device-out as replacement for loading ROM )
+	#0000 .System/vector
+	( go to main program )
+	;main JMP2
+
+|07fe @ROMSTART 00 00

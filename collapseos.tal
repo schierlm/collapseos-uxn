@@ -1,0 +1,112 @@
+~common.tal
+
+@blkinit ( initialize blkfs )
+	#00 .File/append DEO
+	#0400 .File/addr(length) DEO2
+	RTN
+
+@blkfile "blk &startpos "000 &endpos "0 00
+
+@setblkname ( stack: blkno )
+	;blkfile/endpos SWP2 ( stack: charpos number )
+	&nameloop
+	#000a DIV2k SWP2 OVR2 MUL2 ROT2 SWP2 SUB2 #0030 ADD2 ROT2
+	( stack: number/10 number%10+'0' charpos )
+	STAk SWP2 POP2
+	DUP2 ;blkfile/startpos NEQ2 #77 ROT2 ROT2 #0001 SUB2 SWP2 ROT2 POP
+	( stack: charpos-1 number/10 cond )
+	,&nameloop JCN POP2 POP2 ( stack empty )
+	RTN
+
+@op-uxnStorage
+	;ppop JSR2 ;ppop JSR2 ;ppop JSR2 .ZP/tmp1 STZ2 ( tmp1 = block number ) .ZP/tmp2 STZ2 ( tmp2 = memory address )
+	SWP POP DUP #01 EQU ,&read JCN
+	#02 EQU ,&write JCN
+	;handler/stop JMP2
+	&read POP
+	.ZP/tmp1 LDZ2 ;setblkname JSR2
+	;blkfile .File/addr(name) DEO2
+	.ZP/tmp2 LDZ2 .File/addr(read) DEO2
+	;handler/next JMP2
+	&write
+	.ZP/tmp1 LDZ2 ;setblkname JSR2
+	;blkfile .File/addr(name) DEO2
+	.ZP/tmp2 LDZ2 .File/addr(write) DEO2
+	;handler/next JMP2
+
+|0800 @ROMSTART
+
+( ### initialization code - will be overwritten by ROM file ### )
+
+( variables used by initialization program )
+@infile "blkfs 00
+@romfile "collapseos.bin 00
+
+@init
+	#0000 .ZP/tmp1 STZ2 ( tmp1 = offset )
+	&copyfile ( copy blkfs to individual files )
+	( read block )
+	;infile .File/addr(name) DEO2
+	#0400 .File/addr(length) DEO2
+	.ZP/tmp1 LDZ2 ( stack: offs )
+	&readloop
+	;COPYBUF .File/addr(read) DEO2
+	DUP2 #0001 SUB2 SWP2 ( stack: offs-1 offs )
+	#0000 NEQ2 ,&readloop JCN POP2 ( stack empty )
+	.File/success DEI2 #0000 EQU2 ,&done JCN ( quit if EOF reached )
+	( now we need to update the file name )
+	.ZP/tmp1 LDZ2 ;setblkname JSR2
+	( write block )
+	;blkfile .File/addr(name) DEO2
+	#00 .File/append DEO
+	#0400 .File/addr(length) DEO2
+	;COPYBUF .File/addr(write) DEO2
+	.ZP/tmp1 LDZ2 INC2 .ZP/tmp1 STZ2
+	;&copyfile JMP2
+	&done
+	;infile .File/addr(name) DEO2
+	#01 .File/delete DEO
+	( initialize zero page )
+	PS_ADDR .ZP/psp STZ2
+	RS_ADDR .ZP/rsp STZ2
+	#ffff .ZP/ir STZ2
+	;ROMSTART .ZP/pc STZ2
+	#00 .KBuf/read STZ
+	#00 .KBuf/write STZ
+	#00 .KBuf/altgr-flag STZ
+	#00 .ZP/curX STZ
+	#00 .ZP/curY STZ
+	( initialize theme )
+	#0f0f .System/r DEO2
+	#0f0f .System/g DEO2
+	#0ff0 .System/b DEO2
+	( initialize and clear screen )
+	#0290 .Screen/width DEO2
+	#00d8 .Screen/height DEO2
+	.EmptySprite #00
+	&clearloop ADDk #00 SWP STZ INC DUP #08 LTH ,&clearloop JCN
+	ADD #fe SWP STZ
+	;EmptySprite .Screen/addr DEO2
+	#00 #00 ( stack: y x )
+	&lineloop
+	OVR INC #00 SWP #0008 MUL2 .Screen/y DEO2
+	&cellloop
+	DUP INC #00 SWP #0008 MUL2 .Screen/x DEO2
+	#49 .Screen/sprite DEO
+	INC DUP #50 LTH ,&cellloop JCN
+	POP INC #00 OVR #19 LTH ,&lineloop JCN
+	POP2
+	( prepare to read ROM )
+	;romfile .File/addr(name) DEO2
+	#2000 .File/addr(length) DEO2
+	;ROMSTART .File/addr(read)
+
+	( go to main program )
+	;main JMP2
+
+( copy buffer )
+|0a00 @COPYBUF $1
+
+( file device )
+|a0 @File [ &vector $2 &success $2 &addr(stat) $2 &delete $1 &append $1
+            &addr(name) $2 &addr(length) $2 &addr(read) $2 &addr(write) $2 ]

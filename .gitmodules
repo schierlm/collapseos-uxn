@@ -1,0 +1,3 @@
+[submodule "collapseos"]
+	path = collapseos
+	url = https://github.com/schierlm/collapseos

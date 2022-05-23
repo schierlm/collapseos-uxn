@@ -1,0 +1,77 @@
+2 CONSTS $fffa PS_ADDR $ff00 RS_ADDR
+$fe00 VALUE SYSVARS \ synced with vm.c
+SYSVARS $409 - VALUE BLK_MEM
+SYSVARS $80 + VALUE GRID_MEM
+GRID_MEM 2 + VALUE RXTX_MEM
+
+XCOMP FONTC
+
+1 TO BIGEND?
+
+: JMP(i), 17 C, M, ;
+: JMPi, 11 C, M, ;
+: CALLi, 10 C, M, ;
+: i>, 2 C, M, ;
+: (i)>, 3 C, M, ;
+
+XCOMPC
+
+$0800 XSTART
+
+0 JMPi, PC 2 - TO lblboot
+PC TO lblnext PC TO lblcell 7 C,
+PC TO lblxt 12 C,
+PC TO lbldoes 18 C,
+PC TO lblval 19 C,
+
+CODE * 32 C, ;CODE CODE /MOD 34 C, ;CODE
+CODE QUIT PC 35 C, 0 JMPi, PC 2 - TO lblmain
+CODE ABORT 36 C, JMPi, ( to QUIT )
+CODE EXIT 13 C, ;CODE CODE BYE 43 C,
+CODE RCNT 37 C, ;CODE CODE SCNT 42 C, ;CODE
+CODE (br) 30 C, ;CODE CODE (?br) 8 C, ;CODE
+CODE (next) 9 C, ;CODE
+CODE (b) 15 C, ;CODE CODE (n) 16 C, ;CODE
+
+CODE C@ 47 C, ;CODE CODE @ 48 C, ;CODE
+CODE C! 50 C, ;CODE CODE ! 49 C, ;CODE
+CODE NOT 38 C, ;CODE
+CODE AND 39 C, ;CODE CODE OR 40 C, ;CODE
+CODE XOR 41 C, ;CODE
+CODE + 28 C, ;CODE CODE - 29 C, ;CODE
+CODE < 33 C, ;CODE
+CODE R@ 44 C, ;CODE CODE R~ 26 C, ;CODE
+CODE R> 45 C, ;CODE CODE >R 46 C, ;CODE
+
+CODE DUP 0 C, ;CODE CODE DROP 1 C, ;CODE
+CODE ?DUP 14 C, ;CODE
+CODE SWAP 4 C, ;CODE CODE OVER 5 C, ;CODE
+CODE ROT 6 C, ;CODE
+CODE TICKS ;CODE
+CODE EXECUTE 21 C, ;CODE
+CODE uxnDEI 24 C, ;CODE
+CODE uxnDEO 25 C, ;CODE
+CODE uxnDEI2 27 C, ;CODE
+CODE uxnDEO2 31 C, ;CODE
+
+COREL
+
+CREATE ~FNT CPFNT7x7
+
+CODE (key?) 22 C, ;CODE
+CODE uxnStorage 23 C, ;CODE ( n blk( r/w )
+
+: (blk@) 1 uxnStorage ;
+: (blk!) 2 uxnStorage ;
+
+BLKSUB
+
+CODE uxnCell 20 C, ;CODE ( c x y fnt -- )
+
+: COLS 80 ; : LINES 25 ;
+: CELL! ( c pos -- ) COLS /MOD ~FNT uxnCell ;
+: CURSOR! ( new old -- ) DROP 0 SWAP CELL! ;
+
+GRIDSUB
+: INIT BLK$ GRID$ ;
+XWRAP
