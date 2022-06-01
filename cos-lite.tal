@@ -42,4 +42,4 @@
 	( go to main program )
 	;main JMP2
 
-|07fe @ROMSTART 00 00
+|07fe 00 00 @ROMSTART
