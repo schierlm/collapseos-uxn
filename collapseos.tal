@@ -12,7 +12,7 @@
 	&nameloop
 	#000a DIV2k SWP2 OVR2 MUL2 ROT2 SWP2 SUB2 #0030 ADD2 ROT2
 	( stack: number/10 number%10+'0' charpos )
-	STAk SWP2 POP2
+	STAk NIP2
 	DUP2 ;blkfile/startpos NEQ2 #77 ROT2 ROT2 #0001 SUB2 SWP2 ROT2 POP
 	( stack: charpos-1 number/10 cond )
 	,&nameloop JCN POP2 POP2 ( stack empty )
@@ -20,7 +20,7 @@
 
 @op-uxnStorage
 	;ppop JSR2 ;ppop JSR2 ;ppop JSR2 .ZP/tmp1 STZ2 ( tmp1 = block number ) .ZP/tmp2 STZ2 ( tmp2 = memory address )
-	SWP POP DUP #01 EQU ,&read JCN
+	NIP DUP #01 EQU ,&read JCN
 	#02 EQU ,&write JCN
 	;handler/stop JMP2
 	&read POP
@@ -52,7 +52,7 @@
 	&readloop
 	;COPYBUF .File/addr(read) DEO2
 	DUP2 #0001 SUB2 SWP2 ( stack: offs-1 offs )
-	#0000 NEQ2 ,&readloop JCN POP2 ( stack empty )
+	ORA ,&readloop JCN POP2 ( stack empty )
 	.File/success DEI2 #0000 EQU2 ,&done JCN ( quit if EOF reached )
 	( now we need to update the file name )
 	.ZP/tmp1 LDZ2 ;setblkname JSR2
@@ -89,9 +89,9 @@
 	;EmptySprite .Screen/addr DEO2
 	#00 #00 ( stack: y x )
 	&lineloop
-	OVR INC #00 SWP #0008 MUL2 .Screen/y DEO2
+	OVR INC #00 SWP #30 SFT2 .Screen/y DEO2
 	&cellloop
-	DUP INC #00 SWP #0008 MUL2 .Screen/x DEO2
+	INCk #00 SWP #30 SFT2 .Screen/x DEO2
 	#49 .Screen/sprite DEO
 	INC DUP #50 LTH ,&cellloop JCN
 	POP INC #00 OVR #19 LTH ,&lineloop JCN
