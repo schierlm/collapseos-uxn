@@ -52,7 +52,7 @@
 	RTN
 
 @rpop ( read RSP and place on stack, then decrement RSP )
-	.ZP/rsp LDZ2 DUP2 LDA2 SWP2 #0002 SUB2 .ZP/rsp STZ2
+	.ZP/rsp LDZ2 LDA2k SWP2 #0002 SUB2 .ZP/rsp STZ2
 	RTN
 
 @rpush ( increment RSP then store value from stack there )
@@ -60,7 +60,7 @@
 	RTN
 
 @pc16 ( read WORD at PC to stack and increment PC )
-	.ZP/pc LDZ2 DUP2 LDA2 SWP2 INC2 INC2 .ZP/pc STZ2
+	.ZP/pc LDZ2 LDA2k SWP2 INC2 INC2 .ZP/pc STZ2
 	RTN
 
 @jumptable ( jump table for commands )
@@ -87,16 +87,16 @@
 	&normalkey
 	( normal key on stack - store to key buffer )
 	#00 .KBuf/altgr-flag STZ
-	.KBuf/write LDZ #01 ADD #10 MOD .KBuf/read LDZ EQU ,&done JCN ( check for room )
+	.KBuf/write LDZ INC #0f AND .KBuf/read LDZ EQU ,&done JCN ( check for room )
 	DUP .KBuf/write LDZ .KBuf/buf ADD STZ ( store char )
-	.KBuf/write LDZ #01 ADD #10 MOD .KBuf/write STZ ( increase pointer )
+	.KBuf/write LDZ INC #0f AND .KBuf/write STZ ( increase pointer )
 	&done POP
 	BRK
 
 @handler ( run next command )
 	.ZP/pc LDZ2 #ffff EQU2 ,&done JCN
 	&next
-	.ZP/pc LDZ2 DUP2 INC2 .ZP/pc STZ2 LDA ( stack: op )
+	.ZP/pc LDZ2 INC2k .ZP/pc STZ2 LDA ( stack: op )
 	DUP #32 GTH ,&stop JCN
 	#00 SWP DUP2 ADD2 ;jumptable ADD2 LDA2 JMP2
 	&stop
@@ -125,7 +125,7 @@
 	;handler/next JMP2
 
 @op-?DUP
-	;ppeek JSR2 #0000 NEQ2 ,op-DUP JCN
+	;ppeek JSR2 ORA ,op-DUP JCN
 	;handler/next JMP2
 
 @op-DROP
@@ -153,7 +153,7 @@
 	;handler/next JMP2
 
 @op-lblnext ( pc = gw(ir); ir += 2 )
-	.ZP/ir LDZ2 DUP2 LDA2 .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
+	.ZP/ir LDZ2 LDA2k .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
 	;handler/next JMP2
 
 @op-CALLi,
@@ -167,7 +167,7 @@
 
 @op-lblxt
 	.ZP/ir LDZ2 ;rpush JSR2
-	;ppop JSR2 DUP2 INC2 INC2 .ZP/ir STZ2
+	;ppop JSR2 INC2k INC2 .ZP/ir STZ2
 	LDA2 .ZP/pc STZ2
 	;handler/next JMP2
 
@@ -180,7 +180,7 @@
 	;handler/next JMP2
 
 @op-(n)
-	.ZP/ir LDZ2 DUP2 LDA2 ;ppush JSR2 INC2 INC2 .ZP/ir STZ2
+	.ZP/ir LDZ2 LDA2k ;ppush JSR2 INC2 INC2 .ZP/ir STZ2
 	;handler/next JMP2
 
 @op-JMP(i),
@@ -188,7 +188,7 @@
 	;handler/next JMP2
 
 @op-lbldoes
-	;ppop JSR2 DUP2 INC2 INC2 ;ppush JSR2
+	;ppop JSR2 INC2k INC2 ;ppush JSR2
 	LDA2 .ZP/pc STZ2
 	;handler/next JMP2
 
@@ -200,7 +200,7 @@
 	&zero
 	;ppop JSR2 LDA2 ;ppush JSR2
 	&done
-	.ZP/ir LDZ2 DUP2 LDA2 .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
+	.ZP/ir LDZ2 LDA2k .ZP/pc STZ2 INC2 INC2 .ZP/ir STZ2
 	;handler/next JMP2
 
 @op-uxnCell
@@ -210,8 +210,8 @@
 	;ppop JSR2 SWP POP .ZP/tmp2 STZ ( tmp2 = character )
 	.ZP/tmp2 LDZ #20 LTH ,&cursor JCN
 
-	#00 .ZP/tmpY LDZ INC2 #0008 MUL2 .Screen/y DEO2
-	#00 .ZP/tmpX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#00 .ZP/tmpY LDZ INC2 #30 SFT2 .Screen/y DEO2
+	#00 .ZP/tmpX LDZ INC2 #30 SFT2 .Screen/x DEO2
 	#00 .ZP/tmp2 LDZ #20 SUB #0007 MUL2 .ZP/tmp1 LDZ2 ADD2 .Screen/addr DEO2
 	#49 .Screen/sprite DEO
 	;CursorSprite .Screen/addr DEO2
@@ -219,13 +219,13 @@
 	,&done JMP
 	&cursor
 	;CursorSprite .Screen/addr DEO2
-	#00 .ZP/curY LDZ INC2 #0008 MUL2 .Screen/y DEO2
-	#00 .ZP/curX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#00 .ZP/curY LDZ INC2 #30 SFT2 .Screen/y DEO2
+	#00 .ZP/curX LDZ INC2 #30 SFT2 .Screen/x DEO2
 	#4a .Screen/sprite DEO
 	.ZP/tmpX LDZ .ZP/curX STZ
 	.ZP/tmpY LDZ .ZP/curY STZ
-	#00 .ZP/curY LDZ INC2 #0008 MUL2 .Screen/y DEO2
-	#00 .ZP/curX LDZ INC2 #0008 MUL2 .Screen/x DEO2
+	#00 .ZP/curY LDZ INC2 #30 SFT2 .Screen/y DEO2
+	#00 .ZP/curX LDZ INC2 #30 SFT2 .Screen/x DEO2
 	#4f .Screen/sprite DEO
 
 	&done
@@ -237,7 +237,7 @@
 
 @op-(key)
 	.KBuf/read LDZ .KBuf/write LDZ EQU ,&nokey JCN
-	#00 .KBuf/read LDZ DUP INC #10 MOD .KBuf/read STZ .KBuf/buf ADD LDZ ;ppush JSR2
+	#00 .KBuf/read LDZ INCk #0f AND .KBuf/read STZ .KBuf/buf ADD LDZ ;ppush JSR2
 	#0001 ;ppush JSR2
 	;handler/next JMP2
 	&nokey
