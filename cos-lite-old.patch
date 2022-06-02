@@ -7,7 +7,7 @@
  ( constants )
  %SYSVARS+#18 { #fe18 }
  %RS_ADDR { #ff00 }
-@@ -9,6 +12,11 @@
+@@ -9,6 +12,12 @@
  %RTN { JMP2r }
  %HALF2 { DUP2 #8000 AND2 #01 SFT2 ORA2 } ( signed division by 2 )
  
@@ -15,6 +15,7 @@
 +%INC { #01 ADD }
 +%INCk { DUP INC }
 +%INC2k { DUP2 INC2 }
++%NIP { SWP POP }
 +
  ( zero page )
  |00 @ZP [ &psp $2 &rsp $2 &ir $2 &pc $2 &curX $1 &curY $1 &tmpX $1 &tmpY $1 &tmp1 $2 &tmp2 $2 ]
@@ -55,7 +56,7 @@
  	;handler/next JMP2
 @@ -348,8 +356,6 @@
  @op-uxnDEO2
- 	;ppop JSR2 ;ppop JSR2 SWP2 SWP POP DEO2
+ 	;ppop JSR2 ;ppop JSR2 SWP2 NIP DEO2
  	;handler/next JMP2
 -( collapseOS without filesystem support )
 -~common.tal
@@ -65,7 +66,7 @@
 @@ -383,12 +389,12 @@
  	OVR INC #00 SWP #0008 MUL2 .Screen/y DEO2
  	&cellloop
- 	DUP INC #00 SWP #0008 MUL2 .Screen/x DEO2
+ 	INCk #00 SWP #30 SFT2 .Screen/x DEO2
 -	#49 .Screen/sprite DEO
 +	#29 .Screen/color DEO
  	INC DUP #50 LTH ,&cellloop JCN
