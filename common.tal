@@ -4,8 +4,6 @@
 %PS_ADDR { #fffa }
 
 ( macros )
-%MOD { DIVk MUL SUB }
-%MOD2 { DIV2k MUL2 SUB2 }
 %RTN { JMP2r }
 %HALF2 { DUP2 #8000 AND2 #01 SFT2 ORA2 } ( signed division by 2 )
 
@@ -205,9 +203,9 @@
 
 @op-uxnCell
 	;ppop JSR2 .ZP/tmp1 STZ2 ( tmp1 = font address )
-	;ppop JSR2 SWP POP .ZP/tmpY STZ ( tmpY = y coordinate )
-	;ppop JSR2 SWP POP .ZP/tmpX STZ ( tmpX = x coordinate )
-	;ppop JSR2 SWP POP .ZP/tmp2 STZ ( tmp2 = character )
+	;ppop JSR2 NIP .ZP/tmpY STZ ( tmpY = y coordinate )
+	;ppop JSR2 NIP .ZP/tmpX STZ ( tmpX = x coordinate )
+	;ppop JSR2 NIP .ZP/tmp2 STZ ( tmp2 = character )
 	.ZP/tmp2 LDZ #20 LTH ,&cursor JCN
 
 	#00 .ZP/tmpY LDZ INC2 #30 SFT2 .Screen/y DEO2
@@ -282,7 +280,7 @@
 
 @op-/MOD
 	;ppop JSR2 DUP2 ;ppop JSR2 SWP2 OVR2 SWP2
-	MOD2 ;ppush JSR2 SWP2 DIV2 ;ppush JSR2
+	( mod2 ) [ DIV2k MUL2 SUB2 ] ;ppush JSR2 SWP2 DIV2 ;ppush JSR2
 	;handler/next JMP2
 
 @op-QUIT
@@ -338,13 +336,13 @@
 	;handler/next JMP2
 
 @op-uxnDEO
-	;ppop JSR2 SWP POP ;ppop JSR2 SWP POP SWP DEO
+	;ppop JSR2 NIP ;ppop JSR2 NIP SWP DEO
 	;handler/next JMP2
 
 @op-uxnDEI2
-	;ppop JSR2 SWP POP DEI2 ;ppush JSR2
+	;ppop JSR2 NIP DEI2 ;ppush JSR2
 	;handler/next JMP2
 
 @op-uxnDEO2
-	;ppop JSR2 ;ppop JSR2 SWP2 SWP POP DEO2
+	;ppop JSR2 ;ppop JSR2 SWP2 NIP DEO2
 	;handler/next JMP2
