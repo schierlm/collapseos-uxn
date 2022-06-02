@@ -30,9 +30,9 @@
 	;EmptySprite .Screen/addr DEO2
 	#00 #00 ( stack: y x )
 	&lineloop
-	OVR INC #00 SWP #0008 MUL2 .Screen/y DEO2
+	OVR INC #00 SWP #30 SFT2 .Screen/y DEO2
 	&cellloop
-	DUP INC #00 SWP #0008 MUL2 .Screen/x DEO2
+	INCk #00 SWP #30 SFT2 .Screen/x DEO2
 	#49 .Screen/sprite DEO
 	INC DUP #50 LTH ,&cellloop JCN
 	POP INC #00 OVR #19 LTH ,&lineloop JCN
