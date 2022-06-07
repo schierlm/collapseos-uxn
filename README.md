@@ -41,9 +41,6 @@ access. To use, you have to concatenate the forth image file to the core image f
 bytes long, making the forth image end up at `$0800`).
 
 It has been tested in the latest version of the UXN32 emulator (2022-04-26).
-There is also a version of the lite image available, which is built with an older
-version of uxnasm ([commit 8d14b4bbc6f1e50f313293ba301268fbc7d9090e](https://git.sr.ht/~rabbits/uxn/commit/8d14b4bbc6f1e50f313293ba301268fbc7d9090e),
-to be precise), which should work in the [WebUxn](https://aduros.com/webuxn/) emulator.
 
 ## Download
 
