@@ -42,7 +42,7 @@
 	RTN
 
 @ppop ( read PSP and place on stack, then increment PSP )
-	,ppeek JSR .ZP/psp LDZ2 INC2 INC2 .ZP/psp STZ2
+	,ppeek JSR .ZP/psp LDZ2k INC2 INC2 ROT STZ2
 	RTN
 
 @ppush ( decrement psp then store value from stack there )
